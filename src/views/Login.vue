@@ -1,7 +1,7 @@
 <template>
 
     <div class="login-container">
-        <h2>Chmlfrp <el-image style="width: 40px; margin-left: 10px;" src="/favicon.ico"></el-image>
+        <h2>Chmlfrp <el-image style="width: 40px; margin-left: 10px;" src="favicon.ico"></el-image>
         </h2>
 
         <form class="login-form" action="#" method="post">

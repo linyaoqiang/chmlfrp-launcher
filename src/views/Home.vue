@@ -34,7 +34,7 @@
             </div>
             <div class="launcher-about-wrapper">
                 <el-card shadow="always">
-                    <el-image src="/favicon.ico"></el-image>
+                    <el-image src="favicon.ico"></el-image>
                     <p class="version">{{ packageData.name }} v{{ packageData.version }}</p>
                     <p class="description">{{ packageData.description }}</p>
 

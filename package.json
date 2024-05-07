@@ -12,7 +12,8 @@
   "scripts": {
     "dev": "vite",
     "dev-windows": "chcp 65001 && vite",
-    "build": "vue-tsc && vite build && electron-builder",
+    "build-tsc": "vue-tsc && vite build && electron-builder",
+    "build": "vite build && electron-builder",
     "build-64": "vue-tsc && vite build && electron-builder --platform=win --x64",
     "build-32": "vue-tsc && vite build && electron-builder --win --ia32",
     "build-linux": "vue-tsc && vite build && electron-builder --linux",

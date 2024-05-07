@@ -1,6 +1,4 @@
 import request from '@/utils/request'
-
-import axios from "axios";
 import { TunnelCreate, TunnelUpdate } from './types';
 
 export function chmlfrpLogin(username:string, password:string){

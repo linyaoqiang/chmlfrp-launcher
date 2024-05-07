@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, nativeTheme, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { createWindow } from './window'
 import { createTray } from './tray'
 import { clearToken, getToken, saveToken } from "./token";
@@ -12,7 +12,7 @@ import {
     saveAccount,
     getAccount
 } from './settings'
-import { getFrpcLog, getFrpcConfiguration, toggleFrpc, toggleAutoEnable, initFrpc, clearFrpcLog, reProfilePath, executeText, systemProcessinformation } from './chmlfrp'
+import { getFrpcLog, getFrpcConfiguration, toggleFrpc, toggleAutoEnable, initFrpc, clearFrpcLog, executeText, systemProcessinformation } from './chmlfrp'
 import { LevelOption } from 'electron-log'
 
 // 判断是否重复打开应用

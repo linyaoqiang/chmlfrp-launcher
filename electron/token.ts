@@ -1,5 +1,5 @@
 import { hasChildProcess } from "./chmlfrp";
-import { readSettings, saveSettings, settings } from "./settings";
+import { saveSettings, settings } from "./settings";
 
 export interface TokenResult {
   code: number,
