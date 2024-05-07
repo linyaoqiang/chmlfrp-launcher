@@ -25,10 +25,15 @@
                         </el-option>
                     </el-select>
                 </el-form-item>
+
+                <el-form-item label="系统端口模式">
+                    <el-switch v-model="useSystemProcess"/>
+                </el-form-item>
+
                 <el-form-item label="内网端口" prop="nport">
                     <!-- <el-input v-model="ruleForm.nport" /> -->
 
-                    <el-select v-model="ruleForm.nport" filterable allow-create default-first-option
+                    <el-select v-show="!useSystemProcess" v-model="ruleForm.nport" filterable allow-create default-first-option
                         placeholder="请选择或输入端口">
                         <el-option :disabled="item.disabled" v-for="item in portOptions" :key="item.value"
                             :label="item.label" :value="item.value">
@@ -36,6 +41,21 @@
 
                                 <span>{{ item.label }}</span>
                                 <span>{{ item.value }}</span>
+                            </div>
+                        </el-option>
+                    </el-select>
+
+                    <el-select  v-show="useSystemProcess" v-model="ruleForm.nport" filterable allow-create default-first-option
+                        placeholder="请选择或输入端口">
+                        <el-option :disabled="item[5]" v-for="item in systemProcesses" :key="item[4]"
+                           :label="item[0]" :value="item[3]">
+                            <div style="display: flex; justify-content: space-between;text-align: center;">
+
+                                <span style="flex: 1;">{{ item[0] }}</span>
+                                <span style="flex: 1;">{{ item[1] }}</span>
+                                <span style="flex: 1;">{{ item[2] }}</span>
+                                <span style="flex: 1;">{{ item[3] }}</span>
+                                <span style="flex: 1;">{{ item[4] }}</span>
                             </div>
                         </el-option>
                     </el-select>
@@ -113,7 +133,10 @@ const userInfo = ref({})
 const nodes = ref<NodeInfo[]>([])
 const curNode = ref({})
 const tunnelId = route.params.id
-
+const useSystemProcess = ref(false)
+const systemProcesses:string[][] = ref([
+    ['进程', '协议', '监听地址', '端口号', 'PID', true]
+])
 const ruleForm = reactive<TunnelUpdate>({
     tunnelid: tunnelId,
     usertoken: '',
@@ -135,6 +158,10 @@ const ruleForm = reactive<TunnelUpdate>({
 
 
 onMounted(() => {
+
+    window.ipcRenderer.invoke('frpc-system-process').then(ret=>{
+        systemProcesses.value = systemProcesses.value.concat(ret)
+    })
 
 
     window.ipcRenderer.invoke('token-get').then((ret) => {

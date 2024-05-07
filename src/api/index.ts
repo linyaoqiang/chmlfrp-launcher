@@ -111,5 +111,9 @@ export function chmlfrpSinfo() {
 
 
 export function uapisSay() {
-    return axios.get('/us/api/say')
+    return request({
+        url:  'https://uapis.cn/api/say',
+        proxy: false,
+        method:'get'
+    })
 }

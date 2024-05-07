@@ -14,14 +14,4 @@ export function getIconPath(file: string) {
     return path.join(process.env.VITE_PUBLIC,  file)
 }
 
-
-
-// The built directory structure
-//
-// ├─┬─┬ dist
-// │ │ └── index.html
-// │ │
-// │ ├─┬ dist-electron
-// │ │ ├── main.js
-// │ │ └── preload.mjs
-// │
+export const APPLICATION_TITLE = 'Chmlfrp Launcher'

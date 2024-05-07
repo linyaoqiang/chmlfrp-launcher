@@ -2,33 +2,35 @@
   "name": "chmlfrp-launcher",
   "description": "一个简单的Chmlfrp启动器!",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "author": {
     "email": "2033181465@qq.com",
     "name": "JackLin",
-    "url": "http://github.com"
+    "url": "https://github.com/linyaoqiang/chmlfrp-launcher"
   },
   "type": "module",
   "scripts": {
-    "dev": "chcp 65001 && vite",
+    "dev": "vite",
+    "dev-windows": "chcp 65001 && vite",
     "build": "vue-tsc && vite build && electron-builder",
-    "build-64": "vue-tsc && vite build && electron-builder --win --x64",
+    "build-64": "vue-tsc && vite build && electron-builder --platform=win --x64",
     "build-32": "vue-tsc && vite build && electron-builder --win --ia32",
-		"build-linux": "vue-tsc && vite build && electron-builder --linux",
-		"build-mac": "vue-tsc && vite build && electron-builder --mac",
-    "preview": "vite preview",    
-    "electron:generate-icons":"electron-icon-builder --input=./resources/favicon.png --output=build --flatten"
+    "build-linux": "vue-tsc && vite build && electron-builder --linux",
+    "build-mac": "vue-tsc && vite build && electron-builder --mac",
+    "preview": "vite preview",
+    "electron:generate-icons": "electron-icon-builder --input=./resources/favicon.png --output=build --flatten"
   },
   "dependencies": {
+    
+  },
+  "devDependencies": {
     "@element-plus/icons-vue": "^2.3.1",
     "axios": "^1.6.8",
-    "echarts": "^5.5.0",
+    "electron-log": "^5.1.2",
     "electron-win-state": "^1.1.22",
     "element-plus": "^2.7.1",
     "vue": "^3.4.21",
-    "vue-router": "^4.3.2"
-  },
-  "devDependencies": {
+    "vue-router": "^4.3.2",
     "@iconify-json/ep": "^1.1.15",
     "@vitejs/plugin-vue": "^5.0.4",
     "electron": "^30.0.1",

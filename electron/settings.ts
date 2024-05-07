@@ -1,91 +1,160 @@
 import { app } from "electron"
 import fs from 'fs'
 import path from 'path'
-import { notification } from "./notification"
+import { notifiAndLog } from "./notification"
 import { manage, unmanage } from "./window"
 import { hasChildProcess, reProfilePath } from "./chmlfrp"
+import log, { LevelOption } from 'electron-log'
+import crypto from 'crypto'
+
 
 const definePath = app.isPackaged ? path.dirname(app.getPath('exe')) : app.getAppPath()
-const configurationFile = 'settings.json'
-const configurationPath = path.resolve(definePath, configurationFile)
+const settingsFile = 'settings.json'
+const logFile = 'log.log'
+const settingsPath = path.resolve(definePath, settingsFile)
 const frpcFindPathName = 'frpc'
 const profilePathName = 'profiles'
 
 export interface Settings {
-    openAtLogin: boolean,
-    notification: boolean,
-    windowState: boolean,
-    exitOnClose: boolean,
-    logInterval: number,
-    frpcPaths: string[],
-    frpcPath: string,
-    frpcFindPath: string,
-    profilePath: string,
-    userToken: string,
+    openAtLogin: boolean
+    notification: LevelOption
+    windowState: boolean
+    exitOnClose: boolean
+    logInterval: number
+    frpcPaths: string[]
+    frpcPath: string
+    frpcFindPath: string
+    profilePath: string
+
+    logFilePath: string
+    logFileLevel: LevelOption
+    logConsoleLevel: LevelOption
+
+    logConfidentiality: LogConfidentiality
+    userToken: string
+
+    username: string
+    password: string
+    saltKey: string
 }
 
+type LogConfidentiality = 'writing' | 'reading' | false
 
-// code 200 true
+
+export let settings: Settings = {
+    openAtLogin: false,
+    notification: false,
+    windowState: false,
+    exitOnClose: false,
+    logInterval: 1000,
+    frpcPaths: [],
+    frpcPath: '',
+    frpcFindPath: path.resolve(definePath, frpcFindPathName),
+    profilePath: path.resolve(definePath, profilePathName),
+
+    logFilePath: path.resolve(definePath, logFile),
+    logFileLevel: log.transports.file.level,
+    logConsoleLevel: log.transports.console.level,
+
+    logConfidentiality: 'writing',
+
+    userToken: '',
+
+    username: '',
+    password: '',
+    saltKey: ''
+}
+
 export interface SettingsResult {
     code: number,
     msg: string,
     settings: Settings | null
 }
 
+function generateRandomText(length: number) {
+    let result = '';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const charactersLength = characters.length;
+
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+
+    return result;
+}
+
+
+// 加密函数
+function encrypt(text: string, password: string) {
+    const iv = crypto.randomBytes(16); // 初始化向量
+    const cipher = crypto.createCipheriv('aes-256-cbc', crypto.createHash('sha256').update(password).digest(), iv);
+    let encrypted = cipher.update(text);
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+    return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+// 解密函数
+function decrypt(text: string, password: string) {
+    let textParts = text.split(':');
+    let iv = Buffer.from(textParts.shift() as string, 'hex');
+    let encryptedText = Buffer.from(textParts.join(':'), 'hex');
+    let decipher = crypto.createDecipheriv('aes-256-cbc', crypto.createHash('sha256').update(password).digest(), iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString();
+}
+
+export function getAccount() {
+    const username = decrypt(settings.username, settings.saltKey)
+    const password = decrypt(settings.password, settings.saltKey)
+    return {
+        username,
+        password
+    }
+}
+
+
+export function saveAccount(username: string, password: string): SettingsResult {
+    const saltKey = generateRandomText(16)
+    username = encrypt(username, saltKey)
+    password = encrypt(password, saltKey)
+
+    settings.username = username
+    settings.password = password
+    settings.saltKey = saltKey
+    saveSettings()
+
+    return {
+        code: 200,
+        msg: '保存用户成功!',
+        settings
+    }
+}
 
 
 
-export function saveSettings(configuration: Settings, _call:Function | null = null) {
-    const json = JSON.stringify(configuration)
-    fs.writeFile(configurationPath, json, err => {
-        if (err) {
-            console.error(`写入系统设置文件[${configurationPath}]失败, 数据: [${json}]`, err);
-            notification(`写入系统设置文件[${configurationPath}]失败, 数据: [${json}], 错误${err}`)
-        } else {
-            console.log(`写入系统设置文件[${configurationPath}]成功`)
-            if (_call) {
-                _call()
-            }
-        }
-    })
+export function saveSettings() {
+    const json = JSON.stringify(settings)
+    try {
+        fs.writeFileSync(settingsPath, json)
+        notifiAndLog('debug', `写入配置文件${settingsPath}成功!`)
+    } catch (error) {
+        notifiAndLog('error', `写入配置文件${settingsPath}失败! 数据:${json} 错误:${error}`)
+    }
 }
 
 
 export function readSettings() {
-    let configuration: Settings = {
-        openAtLogin: false,
-        notification: false,
-        windowState: false,
-        exitOnClose: false,
-        logInterval: 1000,
-        frpcPaths: [],
-        frpcPath: '',
-        frpcFindPath: path.resolve(definePath, frpcFindPathName),
-        profilePath: path.resolve(definePath, profilePathName),
-        userToken: ''
-    }
     try {
-        Object.assign(configuration, JSON.parse(fs.readFileSync(configurationPath).toString()))
+        Object.assign(settings, JSON.parse(fs.readFileSync(settingsPath).toString()))
+        notifiAndLog('debug', `读取配置文件[${settingsPath}]成功`)
     } catch (err) {
-        console.error(`读取系统设置文件[${configurationPath}]失败`, err);
+        notifiAndLog('debug', `读取配置文件[${settingsPath}]失败 错误:${err}`)
     }
-
-    
-
-    // if(process.platform === 'win32') {
-    //     const { openAtLogin } = app.getLoginItemSettings({
-    //         args: ["--openAsHidden"],
-    //     });
-    //     configuration.openAtLogin = openAtLogin
-    // }else if (process.platform === 'darwin') {
-    //     const { openAtLogin } = app.getLoginItemSettings()
-    //     configuration.openAtLogin = openAtLogin
-    // }
-    return configuration
+    return settings
 }
 
 export function toggleOpenAtLogin(): SettingsResult {
-    const settings = readSettings()
     let ret: SettingsResult = {
         code: 200,
         msg: '操作成功',
@@ -97,98 +166,90 @@ export function toggleOpenAtLogin(): SettingsResult {
         //获取是否开机启动
         ret.code = 404
         ret.msg = '应用未打包，打包后再尝试本功能!'
-        notification(ret.msg)
         return ret
+    } else {
+        if (process.platform != 'win32' && process.platform != 'darwin') {
+            //获取是否开机启动
+            ret.code = 403
+            ret.msg = '该功能无法非windows和darwin(MACOS)上运行!'
+        } else {
+            let currentOpenAtLogin = false
+            if (process.platform === 'win32') {
+                const { openAtLogin } = app.getLoginItemSettings({
+                    args: ["--openAsHidden"],
+                });
+                currentOpenAtLogin = !openAtLogin
+                app.setLoginItemSettings({
+                    openAtLogin: currentOpenAtLogin,
+                    args: ["--openAsHidden"],
+                })
+            } else if (process.platform === 'darwin') {
+                const { openAtLogin } = app.getLoginItemSettings()
+                currentOpenAtLogin = !openAtLogin
+                app.setLoginItemSettings({
+                    openAtLogin: currentOpenAtLogin,
+                    openAsHidden: true,
+                });
+            }
+            settings.openAtLogin = currentOpenAtLogin
+            ret.msg = `${settings.openAtLogin ? '打开' : '关闭'}登录自启成功!`
+        }
     }
 
-
-    // 是否windows||macos
-    if (process.platform != 'win32' && process.platform != 'darwin') {
-        //获取是否开机启动
-        ret.code = 403
-        ret.msg = '该功能无法非windows和darwin(MACOS)上运行!'
-        notification(ret.msg)
-        return ret
-    }
-
-    let currentOpenAtLogin = false
-    if (process.platform === 'win32') {
-        const { openAtLogin } = app.getLoginItemSettings({
-            args: ["--openAsHidden"],
-        });
-        currentOpenAtLogin = !openAtLogin
-        app.setLoginItemSettings({
-            openAtLogin: currentOpenAtLogin,
-            args: ["--openAsHidden"],
-        })
-    } else if (process.platform === 'darwin') {
-        const { openAtLogin } = app.getLoginItemSettings()
-        currentOpenAtLogin = !openAtLogin
-        app.setLoginItemSettings({
-            openAtLogin: currentOpenAtLogin,
-            openAsHidden: true,
-        });
-    }
-    
-    settings.openAtLogin = currentOpenAtLogin
-    ret.settings = settings
-    saveSettings(settings)
-    notification(`${settings.openAtLogin? '打开' : '关闭'}登录自启成功!`)
+    saveSettings()
+    notifiAndLog('verbose', `${ret.msg}`)
     return ret
 }
 
 
 
 
-export function toggleNotification(): SettingsResult {
-    const settings = readSettings()
-    settings.notification = !settings.notification
-    saveSettings(settings)
-    notification(`${settings.notification? '打开' : '关闭'}通知成功!`)
+export function setNotification(type: LevelOption): SettingsResult {
+    settings.notification = type
+    saveSettings()
+    const msg = `${settings.notification ? '打开' : '关闭'}通知成功!`
+    notifiAndLog('verbose', msg)
     return {
         code: 200,
-        msg: '操作成功',
+        msg: msg,
         settings
     }
-    
 }
 
 export function toggleWindowState() {
-    const settings = readSettings()
     settings.windowState = !settings.windowState
-    saveSettings(settings)
-    notification(`${settings.notification? '打开' : '关闭'}窗口状态成功!`)
-
+    saveSettings()
+    const msg = `${settings.windowState ? '打开' : '关闭'}窗口状态成功!`
+    notifiAndLog('verbose', msg)
     if (settings.windowState) {
         manage()
-    }else {
+    } else {
         unmanage()
     }
 
     return {
         code: 200,
-        msg: '操作成功',
+        msg: msg,
         settings
     }
 }
 
 export function toggleExitOnClose() {
-    const settings = readSettings()
     settings.exitOnClose = !settings.exitOnClose
-    saveSettings(settings)
-    notification(`${settings.notification? '打开' : '关闭'}直接退出程序成功!`)
+    const msg = `${settings.notification ? '打开' : '关闭'}直接退出程序成功!`
+    saveSettings()
+    notifiAndLog('verbose', msg)
     return {
         code: 200,
-        msg: '操作成功',
+        msg,
         settings
     }
 }
 
 export function setFrpcPaths(frpcPaths: string[]): SettingsResult {
-    const settings = readSettings()
     const ret: SettingsResult = {
         code: 200,
-        msg: '更新FRPC列表成功!',
+        msg: '操作成功',
         settings
     }
     const realFrpcPaths = frpcPaths.filter(item => {
@@ -198,18 +259,17 @@ export function setFrpcPaths(frpcPaths: string[]): SettingsResult {
         } catch (err) {
             ret.code = 500
             ret.msg += `${item}文件不可用、已经过滤了\r\n`
-            console.error(`${item}文件不可用、已经过滤了`);
-            notification(`${item}文件不可用、已经过滤了`)
+            notifiAndLog('debug', ret.msg)
             return false
         }
     })
     settings.frpcPaths = realFrpcPaths
-    saveSettings(settings)
+    notifiAndLog('verbose', ret.msg)
+    saveSettings()
     return ret
 }
 
 export function setLogInterval(logInterval: number): SettingsResult {
-    const settings = readSettings()
     const ret: SettingsResult = {
         code: 200,
         msg: '修改日志间隔时间成功!',
@@ -219,18 +279,17 @@ export function setLogInterval(logInterval: number): SettingsResult {
     if (logInterval < 100) {
         ret.code = 500
         ret.msg = '日志刷新间隔时间不能大于100ms'
-        
+
     } else {
         settings.logInterval = logInterval
-        saveSettings(settings)
+        saveSettings()
     }
 
-    notification(ret.msg)
+    notifiAndLog('info', ret.msg)
     return ret
 }
 
 export function setFrpcPath(frpcPath: string): SettingsResult {
-    const settings = readSettings()
     const ret: SettingsResult = {
         code: 200,
         msg: '修改FRPC成功!',
@@ -244,17 +303,14 @@ export function setFrpcPath(frpcPath: string): SettingsResult {
     } catch (err) {
         ret.code = 500
         ret.msg = `${frpcPath}文件不可用、已经过滤了`
-        console.error(ret.msg)
-        notification(ret.msg)
-        return ret
+        notifiAndLog('error', ret.msg)
     }
-    saveSettings(settings)
-    notification(ret.msg)
+    saveSettings()
+    notifiAndLog('verbose', ret.msg)
     return ret
 }
 
 export async function setFrpcFindPath(frpcFindPath: string): Promise<SettingsResult> {
-    const settings = readSettings()
     const ret: SettingsResult = {
         code: 200,
         msg: '修改FRPC寻找路径成功!',
@@ -264,37 +320,36 @@ export async function setFrpcFindPath(frpcFindPath: string): Promise<SettingsRes
     if (!fs.existsSync(frpcFindPath)) {
         ret.msg = '路径不存在!'
         ret.code = 500
-        notification(ret.msg)
+        notifiAndLog('verbose', ret.msg)
         return ret
     }
 
-    
+
     const stat = fs.statSync(frpcFindPath)
 
     if (!stat.isDirectory()) {
         ret.code = 500
         ret.msg = '不是一个有效目录!'
-        notification(ret.msg)
+        notifiAndLog('verbose', ret.msg)
         return ret
     }
 
 
     settings.frpcFindPath = frpcFindPath
-    const frpcPaths:string[] = await findFrpcFromFindPath(frpcFindPath)
+    const frpcPaths: string[] = await findFrpcFromFindPath(frpcFindPath)
     settings.frpcPaths = settings.frpcPaths.concat(frpcPaths)
     settings.frpcPaths = [...new Set(settings.frpcPaths)];
-    saveSettings(settings)
-    notification(ret.msg)
+    saveSettings()
+    notifiAndLog('verbose', ret.msg)
     return ret
 }
 
 
-export async function findFrpcFromFindPath(frpcFindPath: string | null):Promise<string[]> {
-    const settings = readSettings()
+export async function findFrpcFromFindPath(frpcFindPath: string | null): Promise<string[]> {
     if (!frpcFindPath) {
         frpcFindPath = settings.frpcFindPath
     }
-    
+
     const frpsPaths: string[] = await findExecutableFiles(frpcFindPath, process.platform === 'win32' ? 'frpc.exe' : 'frpc')
     return frpsPaths;
 
@@ -302,10 +357,6 @@ export async function findFrpcFromFindPath(frpcFindPath: string | null):Promise<
 
 
 export function setProfilePath(profilePath: string): SettingsResult {
-
-
-
-    const settings = readSettings()
     const ret: SettingsResult = {
         code: 200,
         msg: '修改FRPC寻找路径成功!',
@@ -315,40 +366,79 @@ export function setProfilePath(profilePath: string): SettingsResult {
     if (hasChildProcess()) {
         ret.code = 500
         ret.msg = '当前有子进程任务正在运行中!'
-        notification(ret.msg)
+        notifiAndLog('verbose', ret.msg)
         return ret
     }
-
-
-    if (!fs.existsSync(profilePath)) {
-        ret.code = 500
-        ret.msg = '路径不存在!'
-        notification(ret.msg)
-        return ret
-    }
-
-
     const stat = fs.statSync(profilePath)
 
     if (!stat.isDirectory()) {
         ret.code = 500
         ret.msg = '不是一个有效目录!'
-        notification(ret.msg)
+        notifiAndLog('verbose', ret.msg)
         return ret
     }
 
     copyFolder(settings.profilePath, profilePath)
     settings.profilePath = profilePath
-    saveSettings(settings, ()=>{
-        reProfilePath()
-    })
-    notification(ret.msg)
-    
+    saveSettings()
+    reProfilePath()
+    notifiAndLog('verbose', ret.msg)
     return ret
 }
+
+
+export function setLogFilePath(logFilePath: string): SettingsResult {
+
+    const ret: SettingsResult = {
+        code: 200,
+        msg: '修改日志文件路径成功!',
+        settings
+    }
+
+    const stat = fs.statSync(logFilePath)
+
+    if (stat.isDirectory()) {
+        settings.logFilePath = path.resolve(logFilePath, logFile)
+    } else {
+        settings.logFilePath = logFilePath
+    }
+
+    saveSettings()
+    resetLog()
+    return ret
+}
+
+export function setLogLevel(type: 'file' | 'console', level: LevelOption): SettingsResult {
+    const ret: SettingsResult = {
+        code: 200,
+        msg: `切换${type}日志级别为${level}成功`,
+        settings
+    }
+
+    if (type === 'file') {
+        settings.logFileLevel = level
+    } else {
+        settings.logConsoleLevel = level
+    }
+    saveSettings()
+    resetLog()
+    return ret
+}
+
+export function setLogConfidentiality(confidentiality: LogConfidentiality) {
+    const ret: SettingsResult = {
+        code: 200,
+        msg: `${confidentiality === 'writing' ? '写入读取时' : confidentiality === 'reading' ? '读取时' : '不'}隐藏Token`,
+        settings
+    }
+    settings.logConfidentiality = confidentiality
+    saveSettings()
+    return ret
+}
+
 // 检查文件是否是可执行文件
 const isExecutable = (filePath: string): Promise<boolean> => {
-   return new Promise((resolve, _reject) => {
+    return new Promise((resolve, _reject) => {
         fs.access(filePath, fs.constants.X_OK, (err) => {
             if (err) {
                 resolve(false);
@@ -376,8 +466,7 @@ const findExecutableFiles = async (dirPath: string, filename: string): Promise<s
             }
         }
     } catch (err) {
-        console.error('查找可执行文件时发生错误:', err);
-        notification(`查找可执行文件时发生错误:${err}`, )
+        notifiAndLog('debug', `查找可执行文件时发生错误:${err}`)
     }
 
     return results;
@@ -406,7 +495,7 @@ function copyFolder(sourcePath: string, targetPath: string) {
                     // 如果是文件，直接复制文件
                     fs.copyFile(sourceFile, targetFile, err => {
                         if (err) throw err;
-                        console.log(`${sourceFile} 已经拷贝到了 ${targetFile}`);
+                        notifiAndLog('debug', `${sourceFile} 已经拷贝到了 ${targetFile}`)
                     });
                 }
             });
@@ -414,12 +503,38 @@ function copyFolder(sourcePath: string, targetPath: string) {
     });
 }
 
+export function confidentialityLog(text: string) {
+    if (settings.userToken) {
+        text = text.toString()
+        return text.replaceAll(settings.userToken, '******')
+    }
+
+    return text
+}
+
+
+export function initSettings() {
+    readSettings()
+    resetLog()
+    reProfilePath()
+}
+
+export function resetLog() {
+    log.initialize()
+    log.transports.file.resolvePathFn = () => {
+        return settings.logFilePath
+    }
+
+    log.transports.file.level = settings.logFileLevel
+    log.transports.console.level = settings.logConsoleLevel
+}
+
 export default {
 
     readSettings,
     saveSettings,
     toggleOpenAtLogin,
-    toggleNotification,
+    setNotification,
     toggleWindowState,
     toggleExitOnClose,
     setFrpcPaths,
@@ -427,4 +542,5 @@ export default {
     setFrpcFindPath,
     setProfilePath,
     setLogInterval,
+    initSettings
 }

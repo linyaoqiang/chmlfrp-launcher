@@ -1,7 +1,7 @@
 <template>
 
     <div class="login-container">
-        <h2>Chmlfrp <el-image style="width: 40px; margin-left: 10px;" src="https://chmlfrp.cn/favicon.ico"></el-image>
+        <h2>Chmlfrp <el-image style="width: 40px; margin-left: 10px;" src="/favicon.ico"></el-image>
         </h2>
 
         <form class="login-form" action="#" method="post">
@@ -52,19 +52,10 @@ function login() {
             })
         } else {
 
-            window.ipcRenderer.invoke('token-save', data.token).then((data) => {
-                if (data.code === 200) {
-                    router.replace('/')
-                } else {
-                    ElMessage({
-                        message: h('p', { style: 'line-height: 1; font-size: 14px' }, [
-                            h('span', null, '登录失败:'),
-                            h('i', { style: 'color: teal' }, '未知错误'),
-                        ]),
-                    })
-                }
-            })
-
+            
+            window.ipcRenderer.invoke('token-save', data.token)
+            window.ipcRenderer.invoke('settings-save-account', loginForm.username, loginForm.password)
+            router.replace('/')
         }
 
     })

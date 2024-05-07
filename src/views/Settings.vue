@@ -1,5 +1,5 @@
 <template>
-    <div class="settings-container" >
+    <div class="settings-container">
         <el-scrollbar>
             <el-form :model="settings" style="box-sizing: border-box;padding: 40px;" label-width="auto">
                 <el-form-item label="隧道用户自启动">
@@ -9,7 +9,13 @@
                     <el-switch v-model="settings.openAtLogin" @change="onOpenAtLoginChanged" />
                 </el-form-item>
                 <el-form-item label="显示系统通知">
-                    <el-switch v-model="settings.notification" @change="onNotificationChanged" />
+                    <div style="display: flex;">
+                        <el-switch v-model="notificationEnable" @change="onNotificationChanged" />
+                        <el-select v-if="notificationEnable" v-model="settings.notification" placeholder="请选择适合运行的实例"
+                            @change="onNotificationTypeChanged" style="min-width: 200px;margin-left: 20px;">
+                            <el-option v-for="item in logLevels" :key="item" :value="item" :label="item" />
+                        </el-select>
+                    </div>
                 </el-form-item>
                 <el-form-item label="保持窗口状态">
                     <el-switch v-model="settings.windowState" @change="onWindowStateChanged" />
@@ -37,6 +43,7 @@
                     </el-col>
                 </el-form-item>
 
+
                 <el-form-item label="FRPC遍历路径">
                     <el-col :span="18">
                         <el-input v-model="settings.frpcFindPath" :readonly="true"></el-input>
@@ -55,7 +62,7 @@
                     </el-col>
                 </el-form-item>
 
-                <el-form-item label="日志刷新间隔时间">
+                <el-form-item label="FRPC日志刷新间隔时间">
                     <el-input-number v-model="settings.logInterval" :min="100" :max="5000" @blur="onLogIntervalBlur" />
                 </el-form-item>
 
@@ -64,7 +71,7 @@
                         <el-select v-model="dwFileName" placeholder="请选择需要下载的实例">
                             <template v-for="item in Object.keys(systemEntity)" :key="item">
                                 <el-option :disabled="downloadOptionDisabled(item, subItem)"
-                                    v-for="subItem in systemEntity[item]" :key="subItem" :value="subItem"
+                                    v-for="subItem in systemEntity[item]" :key="subItem" :value="subItem.route"
                                     :label="subItem.route">
                                     <div style="display: flex; justify-content: space-between;">
                                         <span>{{ subItem.route }}</span>
@@ -79,30 +86,47 @@
                     </el-col>
                 </el-form-item>
 
+                <el-form-item label="日志输出文件">
+                    <el-col :span="14">
+                        <el-input v-model="settings.logFilePath" :readonly="true"></el-input>
+                    </el-col>
+                    <el-col :span="4" class="text-center">
+                        <el-button type="primary" plain @click="chooseLogFilePath('directory')">选择目录</el-button>
+                    </el-col>
+                    <el-col :span="4" class="text-center" style="margin:0 10px;">
+                        <el-button type="primary" plain @click="chooseLogFilePath('file')">选择文件</el-button>
+                    </el-col>
+                </el-form-item>
+
+
+                <el-form-item label="文件日志级别">
+                    <div style="display: flex;">
+                        <el-switch v-model="logFileEnable" @change="onLogFileLevelChanged('enable')" />
+                        <el-select v-if="logFileEnable" v-model="settings.logFileLevel" placeholder="请选择适合运行的实例"
+                            @change="onLogFileLevelChanged('level')" style="min-width: 200px;margin-left: 20px;">
+                            <el-option v-for="item in logLevels" :key="item" :value="item" :label="item" />
+                        </el-select>
+                    </div>
+                </el-form-item>
+
+                <el-form-item label="控制台日志级别">
+                    <div style="display: flex;">
+                        <el-switch v-model="logConsoleEnable" @change="onLogConsoleLevelChanged('enable')" />
+                        <el-select v-if="logConsoleEnable" v-model="settings.logConsoleLevel" placeholder="请选择适合运行的实例"
+                            @change="onLogConsoleLevelChanged('level')" style="min-width: 200px;margin-left: 20px;">
+                            <el-option v-for="item in logLevels" :key="item" :value="item" :label="item" />
+                        </el-select>
+                    </div>
+                </el-form-item>
 
 
 
-                <!-- <el-form-item label="FRP安装位置">
-                <el-col :span="18">
-                    <el-input>
-                    </el-input v-model="settings.downloadLocation">
-                </el-col>
-                <el-col :span="6" class="text-center">
-                    <el-button type="primary" plain>选择文件夹</el-button>
-                </el-col>
-            </el-form-item>
-
-
-            <el-form-item label="FRP下载位置">
-                <el-col :span="18">
-                    <el-input>
-                    </el-input v-model="settings.installLocation">
-                </el-col>
-                <el-col :span="6" class="text-center">
-                    <el-button type="primary" plain>选择文件夹</el-button>
-                </el-col>
-            </el-form-item> -->
-
+                <el-form-item label="隐藏令牌信息">
+                    <el-select v-model="settings.logConfidentiality" placeholder="请选择适合运行的实例"
+                            @change="onLogConfidentialityChanged" style="min-width: 200px;margin-left: 20px;">
+                        <el-option v-for="item in confidentialities" :key="item" :value="item.value" :label="item.label" />
+                    </el-select>
+                </el-form-item>
 
 
             </el-form>
@@ -111,27 +135,66 @@
 </template>
 
 <script setup lang="ts">
-// @ts-nocheck
-
 import { chmlfrpDownload } from '@/api';
 import { onMounted, reactive, ref } from 'vue';
 const userToken = ref('')
 const autoEnable = ref(false)
+const notificationEnable = ref(false)
+const logFileEnable = ref(false)
+const logConsoleEnable = ref(false)
 const dwFileName = ref('')
-const deleteEnter = ref({
+const deleteEnter:{[key: string]: boolean} = ref({
 
 })
 
+
+type LogLevel = 'error' | 'warn' | 'info' | 'verbose' | 'debug' |
+    'silly';
+type LevelOption = LogLevel | false;
+
+const logLevels = [
+    'error',
+    'warn',
+    'verbose',
+    'info',
+    'debug',
+    'silly'
+]
+
+const confidentialities = [
+    {
+        label: '写入读取时隐藏',
+        value: 'writing'
+    },
+    {
+        label: '读取时隐藏',
+        value: 'reading'
+    },
+    {
+        label: '不隐藏',
+        value: false
+    }
+]
+
+
 interface Settings {
-    openAtLogin: boolean,
-    notification: boolean,
-    windowState: boolean,
-    exitOnClose: boolean,
-    logInterval: number,
-    frpcPaths: string[],
-    frpcPath: string,
-    frpcFindPath: string,
-    profilePath: string,
+    openAtLogin: boolean
+    notification: LevelOption
+    windowState: boolean
+    exitOnClose: boolean
+    logInterval: number
+    frpcPaths: string[]
+    frpcPath: string
+    frpcFindPath: string
+    profilePath: string
+
+    logFilePath: string
+    logFileLevel: LevelOption
+    logConsoleLevel: LevelOption
+
+
+    logConfidentiality: 'writing' | 'reading' | false
+
     userToken: string,
 }
 
@@ -146,13 +209,6 @@ interface ArchEntity {
     architecture: string;
     route: string;
 }
-
-function testHover() {
-    console.log('testHover');
-
-}
-
-
 const settings: Settings = reactive({
     openAtLogin: false,
     notification: false,
@@ -163,8 +219,16 @@ const settings: Settings = reactive({
     frpcPath: '',
     frpcFindPath: '',
     profilePath: '',
+
+    logFilePath: '',
+    logFileLevel: 'silly',
+    logConsoleLevel: 'silly',
+
     userToken: '',
 })
+
+
+
 
 
 
@@ -212,6 +276,9 @@ onMounted(() => {
 
     window.ipcRenderer.invoke('settings-read').then(data => {
         Object.assign(settings, data)
+        notificationEnable.value = settings.notification ? true : false
+        logFileEnable.value = settings.logFileLevel ? true : false
+        logConsoleEnable.value = settings.logConsoleLevel ? true : false
     })
 
     window.ipcRenderer.invoke('token-get').then(ret => {
@@ -248,8 +315,28 @@ function onOpenAtLoginChanged() {
 }
 
 function onNotificationChanged() {
+
+    if (notificationEnable.value === true) {
+        settings.notification = 'verbose'
+    } else {
+        settings.notification = false
+    }
+
     // todo
-    window.ipcRenderer.invoke('settings-notification').then(ret => {
+    window.ipcRenderer.invoke('settings-notification', settings.notification).then(ret => {
+        Object.assign(settings, ret.settings)
+        if (ret.code === 200) {
+            toast('success', `${settings.notification ? '打开' : '关闭'}通知成功!`)
+        } else {
+            toast('error', `${settings.notification ? '打开' : '关闭'}通知失败! 原因：${ret.msg}`)
+        }
+    })
+
+
+}
+
+function onNotificationTypeChanged() {
+    window.ipcRenderer.invoke('settings-notification', settings.notification).then(ret => {
         Object.assign(settings, ret.settings)
         if (ret.code === 200) {
             toast('success', `${settings.notification ? '打开' : '关闭'}通知成功!`)
@@ -364,28 +451,28 @@ function chooseProfilePath() {
     ).then(() => {
 
         window.ipcRenderer.invoke('choose-single-directory').then(ret => {
-        console.log(ret);
-        if (ret.canceled) {
-            toast('wraning', '取消了')
-        } else {
-            const filePath = ret.filePaths[0]
-            window.ipcRenderer.invoke('settings-profile-path', filePath).then(ret => {
-                Object.assign(settings, ret.settings)
-                if (ret.code === 200) {
-                    toast('success', `更换用户数据目录到${filePath}成功!`)
-                }else {
-                    toast('error', ret.msg)
-                }
-            })
+            console.log(ret);
+            if (ret.canceled) {
+                toast('wraning', '取消了')
+            } else {
+                const filePath = ret.filePaths[0]
+                window.ipcRenderer.invoke('settings-profile-path', filePath).then(ret => {
+                    Object.assign(settings, ret.settings)
+                    if (ret.code === 200) {
+                        toast('success', `更换用户数据目录到${filePath}成功!`)
+                    } else {
+                        toast('error', ret.msg)
+                    }
+                })
 
-            
-        }
-    })
+
+            }
+        })
     }).catch(() => {
         toast('info', '更换取消了')
     })
 
-    
+
 }
 
 function onDeleteFrpcPath(item: string) {
@@ -415,37 +502,127 @@ function onDeleteFrpcPath(item: string) {
     })
 }
 
+function chooseLogFilePath(type: 'file' | 'directory') {
+    ElMessageBox.confirm(
+        `你真的要更换日志文件吗?我们不建议更换这个文件、不提供拷贝源日志到新日志文件!`,
+        '警告',
+        {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning',
+        }
+    ).then(() => {
+
+        window.ipcRenderer.invoke(`choose-single-${type}`).then(ret => {
+            if (ret.canceled) {
+                toast('wraning', '取消了')
+            } else {
+                const filePath = ret.filePaths[0]
+                window.ipcRenderer.invoke('settings-log-file-path', filePath).then(ret => {
+                    Object.assign(settings, ret.settings)
+                    if (ret.code === 200) {
+                        toast('success', ret.msg)
+                    } else {
+                        toast('error', ret.msg)
+                    }
+                })
+
+
+            }
+        })
+    }).catch(() => {
+        toast('info', '更换取消了')
+    })
+
+}
+
+function onLogFileLevelChanged(type: 'enable' | 'level') {
+    if (type === 'enable') {
+        if (logFileEnable.value) {
+            if (!settings.logFileLevel) {
+                settings.logFileLevel = 'silly'
+            }
+        } else {
+            settings.logFileLevel = false
+        }
+    }
+
+
+
+    window.ipcRenderer.invoke('settings-log-file-level', settings.logFileLevel).then(ret => {
+        Object.assign(settings, ret.settings)
+        if (ret.code === 200) {
+            toast('success', ret.msg)
+        } else {
+            toast('error', ret.msg)
+        }
+    })
+}
+
+
+function onLogConsoleLevelChanged(type: 'enable' | 'level') {
+    if (type === 'enable') {
+        if (logConsoleEnable.value) {
+            if (!settings.logConsoleLevel) {
+                settings.logConsoleLevel = 'silly'
+            }
+        } else {
+            settings.logConsoleLevel = false
+        }
+    }
+
+
+
+    window.ipcRenderer.invoke('settings-log-console-level', settings.logConsoleLevel).then(ret => {
+        Object.assign(settings, ret.settings)
+        if (ret.code === 200) {
+            toast('success', ret.msg)
+        } else {
+            toast('error', ret.msg)
+        }
+    })
+}
+
+function onLogConfidentialityChanged() {
+    window.ipcRenderer.invoke('settings-log-confidentiality', settings.logConfidentiality).then(ret => {
+        Object.assign(settings, ret.settings)
+        if (ret.code === 200) {
+            toast('success', ret.msg)
+        } else {
+            toast('error', ret.msg)
+        }
+    })
+}
+
 
 function downloadOptionDisabled(platform, downloadOptions) {
-    const realPlatform = platforms[currentPlatform.value.platform]
+            const realPlatform = platforms[currentPlatform.value.platform]
 
-    if (platform !== realPlatform) {
-        return true
-    }
-    const mappingArchs = compatibilities[currentPlatform.value.arch]
-    if (mappingArchs.includes(downloadOptions.architecture)) {
-        return false
-    }
-    return true
-}
+            if (platform !== realPlatform) {
+                return true
+            }
+            const mappingArchs = compatibilities[currentPlatform.value.arch]
+            if (mappingArchs.includes(downloadOptions.architecture)) {
+                return false
+            }
+            return true
+        }
 
 
 function doDownload() {
-    const downloadURL = `https://chmlfrp.cn/dw/${dwFileName.value.route}`
-    console.log(downloadURL);
+            const downloadURL = `https://chmlfrp.cn/dw/${dwFileName.value}`
+            window.ipcRenderer.invoke('download-file', downloadURL)
 
-    window.ipcRenderer.invoke('download-file', downloadURL)
-
-}
+        }
 
 
 
 function toast(type: string, message: string) {
-    ElMessage({
-        message: message,
-        type: type,
-    })
-}
+            ElMessage({
+                message: message,
+                type: type,
+            })
+        }
 
 
 </script>
@@ -460,6 +637,7 @@ function toast(type: string, message: string) {
     width: 100%;
     height: 100%;
 }
+
 .settings-container .el-button {
     width: 100%;
     box-sizing: border-box;

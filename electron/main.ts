@@ -1,31 +1,37 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu, nativeTheme, nativeImage } from 'electron'
 import { createWindow } from './window'
 import { createTray } from './tray'
 import { clearToken, getToken, saveToken } from "./token";
-import { readSettings, toggleOpenAtLogin, setFrpcPaths, setFrpcPath, setLogInterval, 
-    toggleExitOnClose, toggleNotification, toggleWindowState, setFrpcFindPath, setProfilePath } from './settings'
-import { getFrpcLog, getFrpcConfiguration, toggleFrpc, toggleAutoEnable, initFrpc, clearFrpcLog } from './chmlfrp';
+import {
+    readSettings, toggleOpenAtLogin, setFrpcPaths, setFrpcPath, setLogInterval,
+    toggleExitOnClose, setNotification, toggleWindowState, setFrpcFindPath, setProfilePath,
+    initSettings,
+    setLogFilePath,
+    setLogLevel,
+    setLogConfidentiality,
+    saveAccount,
+    getAccount
+} from './settings'
+import { getFrpcLog, getFrpcConfiguration, toggleFrpc, toggleAutoEnable, initFrpc, clearFrpcLog, reProfilePath, executeText, systemProcessinformation } from './chmlfrp'
+import { LevelOption } from 'electron-log'
 
-// 获取单例锁
+// 判断是否重复打开应用
 if (!app.requestSingleInstanceLock()) {
-    // 获取失败则退出程序
     app.exit()
 }
 
 
+// 当开启第二个实例时显示窗口
 app.on('second-instance', (_event, _commandLine, _workingDirectory) => {
-    let windows:BrowserWindow[] = BrowserWindow.getAllWindows()
+    let windows: BrowserWindow[] = BrowserWindow.getAllWindows()
     if (windows.length >= 1) {
         windows[0].focus()
-    }else {
+    } else {
         createWindow()
     }
 })
 
-// 使用Tray来退出，无需该方法
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// 当所有的窗口关闭时，不声明该事件，则直接退出程序
 app.on('window-all-closed', () => {
     // if (process.platform !== 'darwin') {
     //   app.quit()
@@ -47,18 +53,18 @@ app.on('activate', () => {
 })
 
 export function registerHandler() {
-    ipcMain.handle('token-get', async (_event)=>{
+    ipcMain.handle('token-get', async (_event) => {
         return getToken()
     })
 
-    ipcMain.handle('token-save', async (_event, token: string)=>{
+    ipcMain.handle('token-save', async (_event, token: string) => {
         return saveToken(token)
     })
 
-    ipcMain.handle('token-clear',async (_event)=>{
+    ipcMain.handle('token-clear', async (_event) => {
         return clearToken()
     })
-    
+
 
     ipcMain.handle('package-data', async (_event) => {
         return {
@@ -88,6 +94,14 @@ export function registerHandler() {
         return toggleAutoEnable(token)
     })
 
+    ipcMain.handle('frpc-execute-text', async (_event, token: string, tunnelId: string) => {
+        return executeText(token, tunnelId)
+    })
+
+    ipcMain.handle('frpc-system-process', async () => {
+        return await systemProcessinformation()
+    })
+
 
 
 
@@ -112,8 +126,9 @@ export function registerHandler() {
         return toggleExitOnClose()
     })
 
-    ipcMain.handle('settings-notification', () => {
-        return toggleNotification()
+    ipcMain.handle('settings-notification', async (_event, type: LevelOption) => {
+        console.log(type);
+        return setNotification(type)
     })
 
     ipcMain.handle('settings-window-state', () => {
@@ -133,7 +148,7 @@ export function registerHandler() {
         return setFrpcFindPath(frpcFindPath)
     })
 
-    ipcMain.handle('settings-profile-path', async (_event, profilePath: string)=>{
+    ipcMain.handle('settings-profile-path', async (_event, profilePath: string) => {
         return setProfilePath(profilePath)
     })
 
@@ -142,23 +157,46 @@ export function registerHandler() {
         return setLogInterval(logInterval)
     })
 
+    ipcMain.handle('settings-log-file-path', (_event, logFilePath: string) => {
+        return setLogFilePath(logFilePath)
+    })
+
+    ipcMain.handle('settings-log-file-level', (_event, level: LevelOption) => {
+        return setLogLevel('file', level)
+    })
+
+    ipcMain.handle('settings-log-console-level', (_event, level: LevelOption) => {
+        return setLogLevel('console', level)
+    })
+
+    ipcMain.handle('settings-log-confidentiality', (_event, level: 'writing' | 'reading' | false) => {
+        return setLogConfidentiality(level)
+    })
+
+    ipcMain.handle('settings-save-account', (_event, username, password) => {
+        return saveAccount(username, password)
+    })
+
+    ipcMain.handle('settings-get-account', () => {
+        return getAccount()
+    })
     ipcMain.handle('download-file', (_event, url: string) => {
         BrowserWindow.getAllWindows()[0].webContents.downloadURL(url)
         return url
     })
 
-    ipcMain.handle('choose-single-file', async (_event)=>{
+    ipcMain.handle('choose-single-file', async (_event) => {
         return await dialog.showOpenDialog(BrowserWindow.getAllWindows()[0], {
-            title:'选择文件',
+            title: '选择文件',
             message: '选择一个你需要的文件',
             defaultPath: app.getPath('desktop'),
             properties: ['openFile']
         })
     })
 
-    ipcMain.handle('choose-single-directory', async (_event)=>{
+    ipcMain.handle('choose-single-directory', async (_event) => {
         return await dialog.showOpenDialog(BrowserWindow.getAllWindows()[0], {
-            title:'选择目录',
+            title: '选择目录',
             message: '选择一个你需要的目录',
             defaultPath: app.getPath('desktop'),
             properties: ['openDirectory', 'createDirectory', 'promptToCreate']
@@ -167,9 +205,11 @@ export function registerHandler() {
 }
 
 app.whenReady().then(() => {
+    Menu.setApplicationMenu(null)
+    initSettings()
     createWindow()
     createTray()
     registerHandler()
     initFrpc()
-    Menu.setApplicationMenu(null)
+    
 })

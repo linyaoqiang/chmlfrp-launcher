@@ -1,5 +1,5 @@
 import { hasChildProcess } from "./chmlfrp";
-import { readSettings, saveSettings } from "./settings";
+import { readSettings, saveSettings, settings } from "./settings";
 
 export interface TokenResult {
   code: number,
@@ -10,9 +10,8 @@ export interface TokenResult {
 
 // 存储令牌
 export function saveToken(token: string): TokenResult {
-  const settings = readSettings()
   settings.userToken = token
-  saveSettings(settings)
+  saveSettings()
   return {
     code: 200,
     msg: '保存Token成功!',
@@ -22,7 +21,7 @@ export function saveToken(token: string): TokenResult {
 
 // 获取存储的令牌
 export function getToken(): string {
-  return readSettings().userToken
+  return settings.userToken
 }
 
 // 清除存储的令牌
@@ -37,9 +36,11 @@ export function clearToken() {
     ret.code = 500
     ret.msg = '当前有子进程未退出!'
   }else {
-    const settings = readSettings()
     settings.userToken = ''
-    saveSettings(settings)
+    settings.username = ''
+    settings.password = ''
+    settings.saltKey = ''
+    saveSettings()
   }
   return ret
 }

@@ -1,9 +1,9 @@
 <template>
     <div class="tunnel-container" v-loading="tunnelDetailLoading">
-        <el-scrollbar>
-            <div class="tunnel-header">
+        <el-scrollbar >
+            <div class="tunnel-header" >
                 <el-card>
-                    <div class="tunnel-header-content">
+                    <div class="tunnel-header-content" >
                         <span>隧道列表</span>
                         <el-button type="primary" @click="toCreate">添加隧道</el-button>
                     </div>
@@ -13,7 +13,7 @@
 
 
             <div class="tunnel-content" v-loading="pageLoading">
-                <div class="tunnel-item" v-for="(item, index) in userTunnels" :key="index">
+                <div class="tunnel-item" :style="tunnelItemStyle" v-for="(item, index) in userTunnels" :key="index">
                     <el-card>
                         <div class="tunnel-flag">
                             <span>#{{ item.id }} | {{ item.name }}</span>
@@ -190,7 +190,7 @@
 // @ts-nocheck
 import { chmlfrUserTunnel, chmlfrpTunnelDelete, chmlfrpTunnelInfo, chmlfrpUserInfo } from '@/api';
 import { useRouter } from "vue-router";
-import { onMounted, reactive, ref, h } from 'vue';
+import { onMounted, reactive, ref, h, computed } from 'vue';
 
 const router = useRouter()
 const pageLoading = ref(true)
@@ -213,6 +213,19 @@ const tunnelLogDetail = ref(
         intervalInstance: 'log-interval'
     }
 )
+const tunnelItemStyle = computed(()=>{
+    const style:{[key:string]:any} = {}
+    if (userTunnels.value.length <= 1) {
+        style['width'] = '99%'
+    }else if (userTunnels.value.length <= 2) {
+        style['width'] = '49%'
+    }else {
+        style['width'] = '33%'
+    }
+
+    return style
+})
+
 
 
 onMounted(() => {
@@ -222,6 +235,8 @@ onMounted(() => {
             userInfo.value = data
         })
         chmlfrUserTunnel(ret).then(data => {
+            console.log(data);
+            
             userTunnels.value = data
             window.ipcRenderer.invoke('frpc-configuration', ret).then(data => {
                 tunnelProcessInfoList.value = data
@@ -240,6 +255,10 @@ onMounted(() => {
 function openDetail(id) {
     tunnelDetailDisplay.value = true;
     tunnelDetailLoading.value = true;
+
+    window.ipcRenderer.invoke('frpc-execute-text', userToken.value, id).then(ret=>{
+        tunnelDetailBootCode.value = ret
+    })
     tunnelDetailBootCode.value = `frpc -u ${userToken.value} -p ${id}`
 
     chmlfrpTunnelInfo(id).then(data => {
@@ -252,6 +271,9 @@ function openDetail(id) {
     }).finally(() => {
         tunnelDetailLoading.value = false
     })
+
+
+
 }
 
 function toggleFrp(tunnelId) {
@@ -400,7 +422,6 @@ function toast(type: string, title: string, msg: string) {
     top: 0;
     width: 100%;
     box-sizing: border-box;
-    z-index: 999;
 }
 
 .tunnel-header-content {
@@ -432,13 +453,13 @@ function toast(type: string, title: string, msg: string) {
 
 @media screen and (max-width: 1080px) {
     .tunnel-item {
-        width: 49%;
+        width: 49% !important;
     }
 }
 
 @media screen and (max-width: 768px) {
     .tunnel-item {
-        width: 99%;
+        width: 99% !important;
     }
 }
 

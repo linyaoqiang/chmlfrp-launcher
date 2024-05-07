@@ -4,20 +4,38 @@ import { useRouter, useRoute } from 'vue-router'
 
 
 const menuCollapse = ref(false)
-const menuClass = computed(() => {
-  return {
-    'app-slidebar': true,
-    'normal-sliderbar': !menuCollapse.value
-  }
+const size = ref({
+  width: 0,
+  height: 0
 })
+const menuDisplay = computed(() => {
+  return PATHS.includes(route.path)
+})
+const menuStyle = computed(()=>{
+  const style:{[key:string]: any} = {}
+  if (size.value.width > 768 && !menuCollapse.value) {
+    style['flex'] = '1'
+    style['max-width'] = '140px'
+  }
+  return style
+})
+
 const router = useRouter()
 const route = useRoute()
+
+
+
+
 
 onMounted(() => {
   window.ipcRenderer.on('win-resize', (_event, winSize: Array<number>) => {
     // 处理事件
     const [width, height] = winSize
     updateCollapse(width, height)
+    size.value = {
+      width,
+      height
+    }
   });
 
 
@@ -30,7 +48,7 @@ onMounted(() => {
 
 
 function updateCollapse(width: number, _height: number) {
-  if (width < 900) {
+  if (width < 768) {
     menuCollapse.value = true
   } else {
     menuCollapse.value = false
@@ -45,11 +63,13 @@ function toggleCollapse() {
   menuCollapse.value = !menuCollapse.value
 }
 
-const NOT_PATHS = [
-  '/login',
-  '/tunnel/update',
-  '/tunnel/create'
+const PATHS = [
+  '/',
+  '/tunnel',
+  '/settings'
 ]
+
+
 
 
 
@@ -60,9 +80,7 @@ const NOT_PATHS = [
 
 <template>
   <div class="app-container">
-
-    <el-menu v-if="!NOT_PATHS.includes(route.path)" :class="menuClass" :default-active="route.path"
-      :collapse="menuCollapse">
+    <el-menu  v-if="menuDisplay" :style="menuStyle" :default-active="route.path" :collapse="menuCollapse">
       <el-menu-item @click="toggleCollapse">
         <el-icon v-if="menuCollapse">
           <i-ep-expand />
@@ -122,13 +140,12 @@ const NOT_PATHS = [
   display: flex;
   width: 100vw;
   height: 100vh;
-
-
 }
 
 .app-siderbar {
   height: 100vh;
   overflow: hidden;
+  width: 200px !important;
 }
 
 .normal-siderbar {

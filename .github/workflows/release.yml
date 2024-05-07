@@ -1,0 +1,50 @@
+name: Release
+
+# Workflow's trigger
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+jobs:
+    # job's id
+    release:
+      # job's name
+      name: build and release electron app
+      
+      # the type of machine to run the job on
+      runs-on: ${{ matrix.os }}
+      
+      # create a build matrix for jobs
+      strategy:
+        matrix:
+          os: [windows-latest, ubuntu-latest, macos-latest]
+          arch: [x64,x86,arm,arm64]
+      steps:
+        - name: 获取GITHUB仓库
+          uses: actions/checkout@v2
+  
+        - name: 下载 Node.js
+          uses: actions/setup-node@v2-beta
+          with:
+            node-version: 18
+        - name: 下载依赖
+          run: npm install
+    
+        - name: Build app
+          run: npm run build
+        - name: 发布到你GitHubRelease中
+          id: create_release
+          uses: actions/create-release@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            tag_name: ${{ github.ref }}
+            release_name: Release ${{ github.ref }}
+            draft: false
+            prerelease: false
+            body: |
+              Changes in this release:
+              - Features
+              - Bugfixes
+              - ...
+    
