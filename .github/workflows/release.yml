@@ -1,10 +1,7 @@
 name: Release
 
 # Workflow's trigger
-on:
-  push:
-    tags:
-      - 'v*.*.*'
+on: push
 jobs:
     # job's id
     release:
